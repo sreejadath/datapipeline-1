@@ -7,6 +7,7 @@ delta_lake/
 docs/*
 tests/*
 bk_*
+reports/*
 # C extensions
 *.so
 

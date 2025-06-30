@@ -28,9 +28,17 @@ from src.jobs.silver_to_gold_job import (
     run_fact_power_30min_agg,
     run_all_silver_to_gold
 )
+from src.report.report_generator import run_reports
 
 def init_spark():
     """Initialize Spark with basic configuration"""
+    return   SparkSession.builder \
+    .appName("DeltaPipeline") \
+    .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog") \
+    .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
+    .config("spark.jars.packages", "io.delta:delta-core_2.12:2.4.0") \
+    .getOrCreate()
+"""
     return SparkSession.builder \
         .appName("DataPipeline") \
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
@@ -39,7 +47,7 @@ def init_spark():
         .config("spark.driver.memory", "2g") \
         .config("spark.executor.memory", "2g") \
         .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer") \
-        .getOrCreate()
+        .getOrCreate()"""
 def init_energy_charts_connector(endpoint, logger, config):
     """Initialize EnergyChartsConnector with endpoint, logger, and config"""
     # Restructure config for the connector
@@ -203,7 +211,11 @@ def main():
             logger.info("main: Running all Silver to Gold transformations")
             run_all_silver_to_gold(spark, logger, config)
             logger.info("main: All Silver to Gold transformations completed")
-
+        elif args.job == "report":
+            logger.info("main: Running all Silver to Gold transformations")
+            run_reports(spark, logger, config)
+            logger.info("main: All Silver to Gold transformations completed")
+            
         elif args.job == "demo":
             # Initialize EnergyChartsConnector
             energy_charts_connector = init_energy_charts_connector(config['energy_charts_api']['endpoints']['public_power'], logger, config)
@@ -255,6 +267,8 @@ def main():
             logger.info("main: Running all Silver to Gold transformations")
             run_all_silver_to_gold(spark, logger, config)
             logger.info("main: All Silver to Gold transformations completed")
+
+            
         else:
             logger.error(f"main: Unknown job: {args.job}")
             logger.error("main: Available jobs: public_power, price, installed_power, \
