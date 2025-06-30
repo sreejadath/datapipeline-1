@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from src.pipelines.data_ingestion import DataIngestionJob
 import pytz
 
-def ingest_price_job(spark, logger, connector, config, bulk_load_flag:bool , **kwargs):
+def ingest_price_job(spark, logger, job_id, connector, config, bulk_load_flag:bool , **kwargs):
     """
     Ingest api data for a given date range.
     """
@@ -29,7 +29,7 @@ def ingest_price_job(spark, logger, connector, config, bulk_load_flag:bool , **k
         end_date_obj = datetime.strptime(end_date, "%Y-%m-%d").date()
 
 
-        ingestion_job = DataIngestionJob(spark, logger, config, endpoint, current_date, country)
+        ingestion_job = DataIngestionJob(spark, logger, job_id, config, endpoint, current_date, country)
         logger.info(f"Job: ingestion_job created for {current_date}")
 
         if end_date_obj >= now.date():

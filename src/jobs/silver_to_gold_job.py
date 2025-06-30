@@ -17,9 +17,10 @@ class SilverToGoldTransformation:
     Handles Bronze to Silver layer transformations for all energy data types.
     Applies data quality checks, cleansing, and standardization.
     """
-    def __init__(self, spark, logger, config):
+    def __init__(self, spark, logger, job_id, config):
         self.spark = spark
         self.logger = logger
+        self.config = job_id
         self.config = config
         self.gold_path = config['delta_lake']['storage']['gold_path']
 
@@ -313,18 +314,18 @@ class SilverToGoldTransformation:
             raise
 
 # Convenience functions for individual job execution
-def run_dim_production_type(spark, logger, config):
+def run_dim_production_type(spark, logger, job_id, config):
     transformer = SilverToGoldTransformation(spark, logger, config)
     transformer.load_dim_production_type()
 
-def run_fact_power(spark, logger, config):
-    transformer = SilverToGoldTransformation(spark, logger, config)
+def run_fact_power(spark, logger, job_id, config):
+    transformer = SilverToGoldTransformation(spark, logger, job_id, config)
     transformer.load_gold_fact_power()
 
-def run_fact_power_30min_agg(spark, logger, config):
-    transformer = SilverToGoldTransformation(spark, logger, config)
+def run_fact_power_30min_agg(spark, logger, job_id, config):
+    transformer = SilverToGoldTransformation(spark, logger, job_id, config)
     transformer.load_gold_fact_power_30min_agg()
 
-def run_all_silver_to_gold(spark, logger, config):
-    transformer = SilverToGoldTransformation(spark, logger, config)
+def run_all_silver_to_gold(spark, logger, job_id, config):
+    transformer = SilverToGoldTransformation(spark, logger, job_id, config)
     transformer.run_all_transformations()

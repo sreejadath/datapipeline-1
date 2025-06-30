@@ -12,6 +12,7 @@ import pyspark.sql.functions as F
 from datetime import datetime
 import argparse
 import yaml
+import uuid
 from src.connectors.energy_charts_api import EnergyChartsConnector
 from src.jobs.ingest_public_power_job import ingest_public_power_job
 from src.jobs.ingest_price_job import ingest_price_job
@@ -69,7 +70,9 @@ def main():
         
         spark = init_spark()
         #spark.conf.set("spark.sql.warehouse.dir", "/app/delta_lake")
-        logger = Logger("Job",12345678).get_logger()
+        # Generate a unique batch ID for this ingestion run
+        job_id = str(uuid.uuid4())
+        logger = Logger("Job",job_id).get_logger()
         logger.info("main: ...................................................................................")
         logger.info(f"main: Logging system initialized successfully" )
     
@@ -105,17 +108,18 @@ def main():
             # Initialize EnergyChartsConnector
             energy_charts_connector = init_energy_charts_connector(config['energy_charts_api']['endpoints']['public_power'], logger, config)
 
-            ingest_public_power_job(spark \
-                                , logger\
-                                , energy_charts_connector \
-                                , config\
-                                , endpoint = config['energy_charts_api']['endpoints']['public_power'] \
-                                , bulk_load_flag= bulk_load_flag \
-                                , start_date = start_date \
-                                , end_date = end_date\
-                                , country = country \
-                                , interval = interval \
-                               )
+            (ingest_public_power_job(spark 
+                                , logger
+                                , job_id 
+                                , energy_charts_connector 
+                                , config
+                                , endpoint = config['energy_charts_api']['endpoints']['public_power'] 
+                                , bulk_load_flag= bulk_load_flag 
+                                , start_date = start_date 
+                                , end_date = end_date
+                                , country = country 
+                                , interval = interval 
+                               ))
             logger.info("main: Public power data ingestion completed successfully")
             
             # Automatically run Bronze to Silver transformation after ingestion
@@ -130,6 +134,7 @@ def main():
 
             ingest_price_job(spark \
                                 , logger\
+                                , job_id \
                                 , energy_charts_connector \
                                 , config\
                                 , endpoint = config['energy_charts_api']['endpoints']['price'] \
@@ -154,6 +159,7 @@ def main():
 
             ingest_installed_power_job(spark \
                                 , logger\
+                                , job_id \
                                 , energy_charts_connector \
                                 , config\
                                 , endpoint = config['energy_charts_api']['endpoints']['installed_power'] \
@@ -168,52 +174,52 @@ def main():
             # Automatically run Bronze to Silver transformation after ingestion
             if args.layer in ["silver", "all"]:
                 logger.info("main: Starting Bronze to Silver transformation for installed power")
-                run_installed_power_bronze_to_silver(spark, logger, config, country)
+                run_installed_power_bronze_to_silver(spark, logger, job_id, config, country)
                 logger.info("main: Installed power Bronze to Silver transformation completed")
                 
         # Silver Layer Jobs (Bronze to Silver Transformation Only)
         elif args.job == "bronze_to_silver_public_power":
             logger.info("main: Running Bronze to Silver transformation for public power only")
-            run_public_power_bronze_to_silver(spark, logger, config, country)
+            run_public_power_bronze_to_silver(spark, logger, job_id, config, country)
             logger.info("main: Public power Bronze to Silver transformation completed")
             
         elif args.job == "bronze_to_silver_price":
             logger.info("main: Running Bronze to Silver transformation for price only")
-            run_price_bronze_to_silver(spark, logger, config, country)
+            run_price_bronze_to_silver(spark, logger, job_id, config, country)
             logger.info("main: Price Bronze to Silver transformation completed")
             
         elif args.job == "bronze_to_silver_installed_power":
             logger.info("main: Running Bronze to Silver transformation for installed power only")
-            run_installed_power_bronze_to_silver(spark, logger, config, country)
+            run_installed_power_bronze_to_silver(spark, logger, job_id, config, country)
             logger.info("main: Installed power Bronze to Silver transformation completed")
             
         elif args.job == "bronze_to_silver_all":
             logger.info("main: Running all Bronze to Silver transformations")
-            run_all_bronze_to_silver(spark, logger, config, country)
+            run_all_bronze_to_silver(spark, logger, job_id, config, country)
             logger.info("main: All Bronze to Silver transformations completed")
         
         elif args.job == "gold_dim_production_type":
             logger.info("main: Running all Silver to Gold transformations")
-            run_dim_production_type(spark, logger, config)
+            run_dim_production_type(spark, logger, job_id, config)
             logger.info("main: gold_dim_production_type job  load completed")
         
         elif args.job == "gold_fact_power":
             logger.info("main: Running all Silver to Gold transformations")
-            run_fact_power(spark, logger, config)
+            run_fact_power(spark, logger, job_id, config)
             logger.info("main: gold_fact_power job completed")
         
         elif args.job == "gold_fact_power_30min_agg":
             logger.info("main: Running all Silver to Gold transformations")
-            run_fact_power_30min_agg(spark, logger, config)
+            run_fact_power_30min_agg(spark, logger, job_id, config)
             logger.info("main: gold_fact_power_30min_agg job  completed")
 
         elif args.job == "silver_to_gold_all":
             logger.info("main: Running all Silver to Gold transformations")
-            run_all_silver_to_gold(spark, logger, config)
+            run_all_silver_to_gold(spark, logger, job_id, config)
             logger.info("main: All Silver to Gold transformations completed")
         elif args.job == "report":
             logger.info("main: Running all Silver to Gold transformations")
-            run_reports(spark, logger, config)
+            run_reports(spark, logger, job_id, config)
             logger.info("main: All Silver to Gold transformations completed")
             
         elif args.job == "demo":
@@ -222,6 +228,7 @@ def main():
 
             ingest_public_power_job(spark \
                                 , logger\
+                                , job_id \
                                 , energy_charts_connector \
                                 , config\
                                 , endpoint = config['energy_charts_api']['endpoints']['public_power'] \
@@ -236,6 +243,7 @@ def main():
             energy_charts_connector = init_energy_charts_connector(config['energy_charts_api']['endpoints']['price'], logger, config)
             ingest_price_job(spark \
                                 , logger\
+                                , job_id \
                                 , energy_charts_connector \
                                 , config\
                                 , endpoint = config['energy_charts_api']['endpoints']['price'] \
@@ -250,6 +258,7 @@ def main():
             energy_charts_connector = init_energy_charts_connector(config['energy_charts_api']['endpoints']['installed_power'], logger, config)
             ingest_installed_power_job(spark \
                                 , logger\
+                                , job_id \
                                 , energy_charts_connector \
                                 , config\
                                 , endpoint = config['energy_charts_api']['endpoints']['installed_power'] \
@@ -261,11 +270,11 @@ def main():
                                )
             logger.info("main: Installed power data ingestion completed successfully")
             logger.info("main: Running all Bronze to Silver transformations")
-            run_all_bronze_to_silver(spark, logger, config, country)
+            run_all_bronze_to_silver(spark, logger, job_id, config, country)
             logger.info("main: All Bronze to Silver transformations completed")
 
             logger.info("main: Running all Silver to Gold transformations")
-            run_all_silver_to_gold(spark, logger, config)
+            run_all_silver_to_gold(spark, logger, job_id, config)
             logger.info("main: All Silver to Gold transformations completed")
 
             

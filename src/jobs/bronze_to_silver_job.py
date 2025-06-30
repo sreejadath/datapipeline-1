@@ -26,9 +26,10 @@ class BronzeToSilverTransformation:
     Applies data quality checks, cleansing, and standardization.
     """
     
-    def __init__(self, spark: SparkSession, logger: Logger, config: Dict[str, Any]):
+    def __init__(self, spark: SparkSession, logger: Logger, job_id:str, config: Dict[str, Any]):
         self.spark = spark
         self.logger = logger
+        self.job_id = job_id
         self.config = config
         self.silver_path = config['delta_lake']['storage']['silver_path']
         
@@ -37,55 +38,73 @@ class BronzeToSilverTransformation:
         
         # Silver Public Power Schema
         self.silver_public_power_schema = StructType([
+            StructField("record_id", StringType(), False),
+            StructField("business_key", StringType(), False),
             StructField("timestamp", TimestampType(), False),
+            StructField("unix_seconds", IntegerType(), False),
             StructField("production_type", StringType(), False),
             StructField("electricity_generated", DoubleType(), True),
-            StructField("year", IntegerType(), False),
-            StructField("month", IntegerType(), False),
-            StructField("day", IntegerType(), False),
-            StructField("hour", IntegerType(), False),
-            StructField("country", StringType(), False),
-            StructField("unit", StringType(), True),
+            StructField("country", StringType(), True),
+            StructField("data_source", StringType(), False),
             StructField("source_system", StringType(), False),
+            StructField("dq_check_status", StringType(), False),
+            StructField("dq_check_date", StringType(), False),
+            StructField("dq_score", StringType(), False),
+            StructField("is_anomaly", BooleanType(), False),
+            StructField("bronze_record_id", StringType(), False),
+            StructField("silver_batch_id", StringType(), False),
             StructField("ingestion_timestamp", TimestampType(), False),
             StructField("processing_timestamp", TimestampType(), False),
             StructField("data_quality_score", DoubleType(), True),
-            StructField("is_anomaly", BooleanType(), False),
-            StructField("is_valid", BooleanType(), False)
+            StructField("created_by", DoubleType(), True),
         ])
         
         # Silver Price Schema
         self.silver_price_schema = StructType([
+            StructField("record_id", StringType(), False),
+            StructField("business_key", StringType(), False),
             StructField("timestamp", TimestampType(), False),
+            StructField("unix_seconds", IntegerType(), False),
+            StructField("production_type", StringType(), False),
             StructField("electricity_price", DoubleType(), True),
-            StructField("currency", StringType(), False),
-            StructField("year", IntegerType(), False),
-            StructField("month", IntegerType(), False),
-            StructField("day", IntegerType(), False),
-            StructField("country", StringType(), False),
-            StructField("unit", StringType(), True),
+            StructField("electricity_unit", StringType(), True),
+            StructField("country", StringType(), True),
+            StructField("data_source", StringType(), False),
             StructField("source_system", StringType(), False),
+            StructField("dq_check_status", StringType(), False),
+            StructField("dq_check_date", StringType(), False),
+            StructField("dq_score", StringType(), False),
+            StructField("is_anomaly", BooleanType(), False),
+            StructField("bronze_record_id", StringType(), False),
+            StructField("silver_batch_id", StringType(), False),
             StructField("ingestion_timestamp", TimestampType(), False),
             StructField("processing_timestamp", TimestampType(), False),
             StructField("data_quality_score", DoubleType(), True),
-            StructField("is_anomaly", BooleanType(), False),
-            StructField("is_valid", BooleanType(), False)
+            StructField("created_by", DoubleType(), True)
         ])
         
         # Silver Installed Power Schema
         self.silver_installed_power_schema = StructType([
+            StructField("record_id", StringType(), False),
+            StructField("business_key", StringType(), False),
             StructField("timestamp", TimestampType(), False),
+            StructField("time_period", StringType(), False),
             StructField("production_type", StringType(), False),
             StructField("installed_capacity", DoubleType(), True),
-            StructField("year", IntegerType(), False),
-            StructField("month", IntegerType(), False),
-            StructField("country", StringType(), False),
             StructField("unit", StringType(), True),
+            StructField("country", StringType(), True),
+            StructField("data_source", StringType(), False),
             StructField("source_system", StringType(), False),
+            StructField("dq_check_status", StringType(), False),
+            StructField("dq_check_date", StringType(), False),
+            StructField("dq_score", StringType(), False),
+            StructField("is_anomaly", BooleanType(), False),
+            StructField("bronze_record_id", StringType(), False),
+            StructField("silver_batch_id", StringType(), False),
             StructField("ingestion_timestamp", TimestampType(), False),
             StructField("processing_timestamp", TimestampType(), False),
             StructField("data_quality_score", DoubleType(), True),
-            StructField("is_valid", BooleanType(), False)
+            StructField("created_by", DoubleType(), True)
         ])
 
     def _apply_data_quality_checks(self, df: DataFrame, data_type: str) -> DataFrame:
@@ -245,6 +264,7 @@ class BronzeToSilverTransformation:
                 lit(country).alias("country"),
                 lit("MW").alias("unit"),
                 lit("energy_charts_api").alias("source_system"),
+                lit(self.job_id).alias("silver_batch_id"),
                 col("ingestion_date").alias("ingestion_timestamp"),
                 current_timestamp().alias("processing_timestamp")
             )
@@ -324,6 +344,7 @@ class BronzeToSilverTransformation:
                 lit(country).alias("country"),
                 coalesce(col("electricity_unit"), lit("EUR/MWh")).alias("unit"),
                 lit("energy_charts_api").alias("source_system"),
+                lit(self.job_id).alias("silver_batch_id"),
                 col("ingestion_date").alias("ingestion_timestamp"),
                 current_timestamp().alias("processing_timestamp")
             )
@@ -400,6 +421,7 @@ class BronzeToSilverTransformation:
                 col("country"),
                 lit("GW").alias("unit"),
                 col("source_system"),
+                lit(self.job_id).alias("silver_batch_id"),
                 col("ingestion_date").alias("ingestion_timestamp"),
                 current_timestamp().alias("processing_timestamp")
             )
@@ -631,19 +653,19 @@ class BronzeToSilverTransformation:
     
 
 # Convenience functions for individual job execution
-def run_public_power_bronze_to_silver(spark: SparkSession, logger: Logger, config: Dict[str, Any], country: str = "de"):
+def run_public_power_bronze_to_silver(spark: SparkSession, logger: Logger, job_id:str, config: Dict[str, Any], country: str = "de"):
     """Run public power Bronze to Silver transformation"""
-    transformer = BronzeToSilverTransformation(spark, logger, config)
+    transformer = BronzeToSilverTransformation(spark, logger, job_id, config)
     transformer.transform_public_power_to_silver(country)
 
-def run_price_bronze_to_silver(spark: SparkSession, logger: Logger, config: Dict[str, Any], country: str = "de"):
+def run_price_bronze_to_silver(spark: SparkSession, logger: Logger, job_id:str, config: Dict[str, Any], country: str = "de"):
     """Run price Bronze to Silver transformation"""
-    transformer = BronzeToSilverTransformation(spark, logger, config)
+    transformer = BronzeToSilverTransformation(spark, logger, job_id, config)
     transformer.transform_price_to_silver(country)
 
-def run_installed_power_bronze_to_silver(spark: SparkSession, logger: Logger, config: Dict[str, Any], country: str = "de"):
+def run_installed_power_bronze_to_silver(spark: SparkSession, logger: Logger, job_id:str, config: Dict[str, Any], country: str = "de"):
     """Run installed power Bronze to Silver transformation using SQL"""
-    transformer = BronzeToSilverTransformation(spark, logger, config)
+    transformer = BronzeToSilverTransformation(spark, logger, job_id, config)
     transformer.transform_installed_power_to_silver(country)
     success = None
     #success = transformer.transform_installed_power_sql()
@@ -655,7 +677,7 @@ def run_installed_power_bronze_to_silver(spark: SparkSession, logger: Logger, co
         logger.info("Attempting fallback to original transformation method")
         transformer.transform_installed_power_to_silver(country)
 
-def run_all_bronze_to_silver(spark: SparkSession, logger: Logger, config: Dict[str, Any], country: str = "de"):
+def run_all_bronze_to_silver(spark: SparkSession, logger: Logger, job_id:str, config: Dict[str, Any], country: str = "de"):
     """Run all Bronze to Silver transformations"""
-    transformer = BronzeToSilverTransformation(spark, logger, config)
+    transformer = BronzeToSilverTransformation(spark, logger, job_id, config)
     transformer.run_all_transformations(country)

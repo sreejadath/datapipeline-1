@@ -12,7 +12,7 @@ from src.connectors.energy_charts_api import EnergyChartsConnector
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType, TimestampType, LongType, DecimalType
 
 class DataIngestionJob:
-    def __init__(self, spark: SparkSession, logger: Logger, config: Dict[str, Any], endpoint: str, current_date: str, country:str):
+    def __init__(self, spark: SparkSession, logger: Logger, job_id, config: Dict[str, Any], endpoint: str, current_date: str, country:str):
         self.spark = spark
         self.logger = logger
         self.current_date = current_date
@@ -21,9 +21,7 @@ class DataIngestionJob:
         self.start_date = current_date
         self.end_date = current_date
         self.config = config
-        # Generate a unique batch ID for this ingestion run
-        self.ingestion_batch_id = str(uuid.uuid4())
-        self.logger.info(f"Pipeline: Generated ingestion batch ID: {self.ingestion_batch_id}")
+        self.ingestion_batch_id = job_id
         
         # Construct the path (same as before)
         self.bronze_path = os.path.join(

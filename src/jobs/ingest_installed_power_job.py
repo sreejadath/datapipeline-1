@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from src.pipelines.data_ingestion import DataIngestionJob
 import pytz
 
-def ingest_installed_power_job(spark, logger, connector, config, bulk_load_flag:bool , **kwargs):
+def ingest_installed_power_job(spark, logger, job_id, connector, config, bulk_load_flag:bool , **kwargs):
     """
     Ingest installed power data (monthly capacity data).
     """
@@ -21,7 +21,7 @@ def ingest_installed_power_job(spark, logger, connector, config, bulk_load_flag:
     endpoint = kwargs.get('endpoint', 'installed_power')
     time_step = kwargs.get('time_step', 'monthly')
 
-    ingestion_job = DataIngestionJob(spark, logger, config, endpoint, now.date().isoformat(), country)
+    ingestion_job = DataIngestionJob(spark, logger, job_id, config, endpoint, now.date().isoformat(), country)
     logger.info(f"Job: ingestion_job created for {endpoint} with country {country}")
 
     try:

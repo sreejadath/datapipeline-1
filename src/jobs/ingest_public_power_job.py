@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from src.pipelines.data_ingestion import DataIngestionJob
 import pytz
 
-def ingest_public_power_job(spark, logger, connector, config, bulk_load_flag:bool , **kwargs):
+def ingest_public_power_job(spark, logger, job_id, connector, config, bulk_load_flag:bool , **kwargs):
     """
     Ingest api data for a given date range.
     """
@@ -25,7 +25,7 @@ def ingest_public_power_job(spark, logger, connector, config, bulk_load_flag:boo
         current_date = datetime.strptime(start_date, "%Y-%m-%d").date()
         end_date_obj = datetime.strptime(end_date, "%Y-%m-%d").date()
 
-        ingestion_job = DataIngestionJob(spark, logger, config, endpoint, current_date, country)
+        ingestion_job = DataIngestionJob(spark, logger, job_id, config, endpoint, current_date, country)
         logger.info(f"Job: ingestion_job created for {current_date}")
 
         while current_date <= end_date_obj:
